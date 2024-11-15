@@ -1,0 +1,37 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build SDL2 Project",
+            "type": "shell",
+            "command": "gcc",
+            "args": [
+                "-g",
+                "-v",
+                "${workspaceFolder}/src/main.c",
+                "${workspaceFolder}/src/charSelection.c",
+                "${workspaceFolder}/src/fightingGround.c",
+                "-o",
+                "${workspaceFolder}/src/fight2.exe",
+                "-I", "C:/MinGW/include/SDL2",
+                "-I", "C:/GnuWin32/include", 
+                "-L", "C:/MinGW/lib",
+                "-L", "C:/GnuWin32/lib",
+                "-lmingw32",
+                "-lSDL2main",
+                "-lSDL2",
+                "-lSDl2_mixer",
+                "-lSDL2_ttf",
+                "-lSDL2_image",
+                "-lgif", 
+                "-mwindows"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": ["$gcc"],
+            "detail": "Compiles the SDL2 project with MinGW GCC"
+        }
+    ]
+}
