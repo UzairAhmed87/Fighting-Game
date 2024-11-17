@@ -6,15 +6,16 @@
 #include <string.h>
 #include <stdbool.h>
 #include "../include/charSelection.h"
+#include <SDL_ttf.h>
 
 // Define constants
-#define FRAME_DELAY 70  
+#define FRAME_DELAY 100  
 #define MAX_FRAMES 100  // Maximum frames per movement (adjust as needed)
 #define NUM_MOVES 5     
 #define MOVE_SPEED 10   
 #define CHARACTER_SPEED 5 
 #define MAX_HEALTH 100  // Maximum health for characters
-
+#define ATTACK_COOLDOWN 500 // Add a cooldown period in milliseconds (e.g., 500 ms)
 // Global variables
 SDL_Texture *backgroundTexture = NULL;
 SDL_Texture *characterFrames[NUM_CHARACTERS][NUM_MOVES][MAX_FRAMES] = {NULL};
@@ -24,6 +25,9 @@ CharacterMove previousCharacterStates[NUM_CHARACTERS] = {MOVE_STANDING, MOVE_STA
 int currentFrame[NUM_CHARACTERS] = {0, 0};
 Uint64 lastFrameTime[NUM_CHARACTERS] = {0, 0};
 
+ // Track the last attack time for each character
+Uint64 lastAttackTime[2] = {0, 0};
+
 // Health values for both characters
 int characterHealth[2] = {MAX_HEALTH, MAX_HEALTH};
 
@@ -32,7 +36,8 @@ SDL_Rect characterPositions[2] = {
     {100, 450, 80, 100}, // Position for the first character
     {550, 450, 80, 110}  // Position for the second character
 };
-
+SDL_Rect popupRect = {200, 150, 400, 300};
+SDL_Rect buttonRect = {350, 400, 100, 50};
 // Function to load character frames
 void loadCharacterFrames(SDL_Renderer *renderer) {
     char framePath[150];
@@ -91,47 +96,102 @@ bool checkCollision(SDL_Rect a, SDL_Rect b) {
     return (a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y);
 }
 
-// Function to handle character attacks and health updates
-void handleCharacterAttacks() {
-    SDL_Rect attackRect[2];
-    bool collisionDetected[2] = {false, false};
 
+bool gameOver = false; // To check if the game is over
+int winner = -1; // To store the winner (0 or 1)
+
+// Function to handle character attacks, health updates with pushback logic
+void handleCharacterAttacks() {
+   
+    SDL_Rect attackRect[2];
+    Uint64 currentTime = SDL_GetTicks64();
+
+    // Define attack range offsets
+    const int PUNCH_RANGE = 5;  // Reduced punch range for more realistic detection
+    const int KICK_RANGE = 10;   // Reduced kick range for more realistic detection
+    const int PUSHBACK_DISTANCE = 15;  // Distance to push back the character when hit
+
+    // Set up attack rectangles based on current attack state
     for (int i = 0; i < 2; i++) {
         if (characterStates[i] == MOVE_PUNCH || characterStates[i] == MOVE_KICK) {
             attackRect[i] = characterPositions[i];
-            if (characterStates[i] == MOVE_PUNCH) {
-                attackRect[i].w += 30; // Extend punch range
-            } else if (characterStates[i] == MOVE_KICK) {
-                attackRect[i].w += 40; // Extend kick range
+
+            if (i == 0) { // Character 1 attacks to the right
+                attackRect[i].x += attackRect[i].w;
+                attackRect[i].w = (characterStates[i] == MOVE_PUNCH) ? PUNCH_RANGE : KICK_RANGE;
+            } else { // Character 2 attacks to the left
+                attackRect[i].x -= (characterStates[i] == MOVE_PUNCH) ? PUNCH_RANGE : KICK_RANGE;
+                attackRect[i].w = (characterStates[i] == MOVE_PUNCH) ? PUNCH_RANGE : KICK_RANGE;
             }
         } else {
-            attackRect[i] = (SDL_Rect){0, 0, 0, 0}; // No attack
+            attackRect[i] = (SDL_Rect){0, 0, 0, 0};
         }
     }
 
-    // Check for collisions and update health
-    if (checkCollision(attackRect[0], characterPositions[1])) {
-        collisionDetected[0] = true; // Character 1 hits Character 2
+    // Check for collisions and update health with cooldown and pushback logic
+    if (checkCollision(attackRect[0], characterPositions[1]) && 
+        currentTime > lastAttackTime[0] + ATTACK_COOLDOWN) {
         if (characterStates[0] == MOVE_PUNCH) {
-            characterHealth[1] -= 5; // Punch: 5% health decrease
+            characterHealth[1] -= 5;
         } else if (characterStates[0] == MOVE_KICK) {
-            characterHealth[1] -= 10; // Kick: 10% health decrease
+            characterHealth[1] -= 10;
         }
         if (characterHealth[1] < 0) characterHealth[1] = 0;
+        lastAttackTime[0] = currentTime;
+
+        characterPositions[1].x += PUSHBACK_DISTANCE;
+        if (characterPositions[1].x > 800 - characterPositions[1].w) {
+            characterPositions[1].x = 800 - characterPositions[1].w;
+        }
     }
-    if (checkCollision(attackRect[1], characterPositions[0])) {
-        collisionDetected[1] = true; // Character 2 hits Character 1
+
+    if (checkCollision(attackRect[1], characterPositions[0]) && 
+        currentTime > lastAttackTime[1] + ATTACK_COOLDOWN) {
         if (characterStates[1] == MOVE_PUNCH) {
-            characterHealth[0] -= 5; // Punch: 5% health decrease
+            characterHealth[0] -= 5;
         } else if (characterStates[1] == MOVE_KICK) {
-            characterHealth[0] -= 10; // Kick: 10% health decrease
+            characterHealth[0] -= 10;
         }
         if (characterHealth[0] < 0) characterHealth[0] = 0;
+        lastAttackTime[1] = currentTime;
+
+        characterPositions[0].x -= PUSHBACK_DISTANCE;
+        if (characterPositions[0].x < 0) {
+            characterPositions[0].x = 0;
+        }
+    }
+
+    // Check if any player has died and trigger the dead animation
+    if (characterHealth[0] == 0 && !gameOver) {
+        gameOver = true;
+        winner = 1;  // Player 2 wins
+        // You could add dead animation here if you have it
+        characterStates[0] = MOVE_DEAD; // Assume you have a "dead" state for the character
+        
+        
+    }
+    if (characterHealth[1] == 0 && !gameOver) {
+        gameOver = true;
+        winner = 0;  // Player 1 wins
+        // You could add dead animation here if you have it
+        characterStates[1] = MOVE_DEAD; // Assume you have a "dead" state for the character
     }
 }
 
 // Function to handle events and update character states
-void handleEvents(SDL_Event *event) {
+void handleEvents(SDL_Event *event,GameState *currentState) {
+     if (gameOver) {
+        if (event->type == SDL_MOUSEBUTTONDOWN) {
+            int x, y;
+            SDL_GetMouseState(&x, &y);
+            if (x >= buttonRect.x && x <= buttonRect.x + buttonRect.w &&
+                y >= buttonRect.y && y <= buttonRect.y + buttonRect.h) {
+                *currentState = MAIN_MENU;  // Return to main menu
+                resetGameState();
+            }
+        }
+        return;
+    }
     if (event->type == SDL_KEYDOWN) {
         switch (event->key.keysym.sym) {
             case SDLK_a:
@@ -181,6 +241,7 @@ void handleEvents(SDL_Event *event) {
 
 // Function to update character positions based on states
 void updateCharacterPositions() {
+       if (gameOver) return;
     for (int i = 0; i < NUM_CHARACTERS; i++) {
         if (characterStates[i] == MOVE_FORWARD) {
             characterPositions[i].x += CHARACTER_SPEED;
@@ -196,9 +257,60 @@ void updateCharacterPositions() {
         }
     }
 }
+SDL_Rect Messagerect = {400, 300, 0, 0};  // Position at (400, 300), width and height 0 (to be calculated)
+
+void renderGameOver(SDL_Renderer *renderer, TTF_Font *font) {
+    SDL_Rect buttonTextRect;
+    const char *winnerMessage = (winner == 0) ? "Player 1 Wins!" : "Player 2 Wins!";
+    SDL_Color whiteColor = {255, 255, 255, 255}; // White text
+
+    // Calculate text size
+    int textWidth, textHeight;
+    TTF_SizeText(font, winnerMessage, &textWidth, &textHeight);
+
+    // Center the message
+    Messagerect.x = (800 - textWidth) / 2;
+    Messagerect.y = (600 - textHeight) / 2 - 50; // Adjust Y for positioning
+    Messagerect.w = textWidth;
+    Messagerect.h = textHeight;
+
+    // Draw a background rectangle for the message
+    SDL_Rect messageBackground = {Messagerect.x - 20, Messagerect.y - 10, textWidth + 40, textHeight + 20};
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 200); // Black with some transparency
+    SDL_RenderFillRect(renderer, &messageBackground);
+
+    // Render the winner message
+    renderText(renderer, winnerMessage, font, whiteColor, &Messagerect);
+
+    // Render "Back to Main Menu" button
+    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255); // White button background
+    SDL_RenderFillRect(renderer, &buttonRect);
+
+    // Calculate and center button text
+    const char *buttonText = "Main Menu";
+    SDL_Color blackColor = {0, 0, 0, 255}; // Black text
+    int buttonTextWidth, buttonTextHeight;
+    TTF_SizeText(font, buttonText, &buttonTextWidth, &buttonTextHeight);
+
+    buttonRect.x = (800 - buttonRect.w) / 2; // Center horizontally
+    buttonTextRect.x = buttonRect.x + (buttonRect.w - buttonTextWidth) / 2;
+    buttonTextRect.y = buttonRect.y + (buttonRect.h - buttonTextHeight) / 2;
+    buttonTextRect.w = buttonTextWidth;
+    buttonTextRect.h = buttonTextHeight;
+
+    renderText(renderer, buttonText, font, blackColor, &buttonTextRect);
+}
+
 
 // Main function to render the fighting ground
-void renderFightingGround(SDL_Renderer *renderer) {
+void renderFightingGround(SDL_Renderer *renderer, TTF_Font *font) {
+    if (gameOver) {
+        // Render game-over popup and menu button
+        renderGameOver(renderer, font);
+        return; // Exit early if the game is over
+    }
+
+    // Render the background
     if (!backgroundTexture) {
         backgroundTexture = IMG_LoadTexture(renderer, "../assets/images/bg.png");
         if (!backgroundTexture) {
@@ -207,8 +319,11 @@ void renderFightingGround(SDL_Renderer *renderer) {
         }
     }
     SDL_RenderCopy(renderer, backgroundTexture, NULL, NULL);
+
+    // Render health bars
     renderHealthBars(renderer);
 
+    // Render characters
     for (int i = 0; i < 2; i++) {
         int characterIndex = selectedCharacters[i];
         if (characterIndex < 0) continue;
@@ -217,7 +332,10 @@ void renderFightingGround(SDL_Renderer *renderer) {
         int frameCount;
         int moveType = characterStates[i];
 
-        if (moveType >= 0 && moveType < NUM_MOVES) {
+        if (moveType == MOVE_DEAD) {
+            currentTexture = characterFrames[characterIndex][MOVE_DEAD][currentFrame[i]];
+            frameCount = characterFrameCounts[characterIndex][MOVE_DEAD];
+        } else if (moveType >= 0 && moveType < NUM_MOVES) {
             currentTexture = characterFrames[characterIndex][moveType][currentFrame[i]];
             frameCount = characterFrameCounts[characterIndex][moveType];
         } else {
@@ -247,5 +365,35 @@ void renderFightingGround(SDL_Renderer *renderer) {
             SDL_RenderCopyEx(renderer, currentTexture, NULL, &characterDestRect, 0, NULL, flip);
         }
     }
-    handleCharacterAttacks();
+
+    handleCharacterAttacks(); // Handle character attacks logic
+}
+void resetGameState() {
+    // Reset health
+    characterHealth[0] = MAX_HEALTH;
+    characterHealth[1] = MAX_HEALTH;
+
+    // Reset character states
+    characterStates[0] = MOVE_STANDING;
+    characterStates[1] = MOVE_STANDING;
+    previousCharacterStates[0] = MOVE_STANDING;
+    previousCharacterStates[1] = MOVE_STANDING;
+    
+    // Reset frames
+    currentFrame[0] = 0;
+    currentFrame[1] = 0;
+    lastFrameTime[0] = 0;
+    lastFrameTime[1] = 0;
+
+    // Reset positions
+    characterPositions[0] = (SDL_Rect){100, 450, 80, 100};
+    characterPositions[1] = (SDL_Rect){550, 450, 80, 110};
+
+    // Reset attack cooldowns
+    lastAttackTime[0] = 0;
+    lastAttackTime[1] = 0;
+
+    // Reset game-over flag and winner
+    gameOver = false;
+    winner = -1;
 }

@@ -87,7 +87,7 @@ int main(int argc, char *argv[])
     loadBackgroundMusic();
     playBackgroundMusic();
     SDL_RenderClear(renderer);
-    renderFightingGround(renderer);
+    renderFightingGround(renderer,font);
 
     // Main loop
 
@@ -110,7 +110,7 @@ int main(int argc, char *argv[])
             }
             else if (currentState == FIGHTING_GROUND)
             {
-                handleEvents(&event);
+                handleEvents(&event,&currentState);
             }
             updateCharacterPositions();
             SDL_Delay(16);
@@ -129,7 +129,14 @@ int main(int argc, char *argv[])
         }
         else if (currentState == FIGHTING_GROUND)
         {
-            renderFightingGround(renderer);
+            renderFightingGround(renderer,font);
+            
+        }
+        else if(currentState == GAME_OVER)
+        {
+             
+            renderGameOver(renderer, font);
+           
         }
         SDL_RenderPresent(renderer);
     }
