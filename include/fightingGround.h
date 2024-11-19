@@ -5,7 +5,7 @@
 #include <SDL_ttf.h>
 #include "charSelection.h"
 
-// This is correct if the background texture is used across multiple files
+
 extern SDL_Texture *backgroundTexture; 
 
 // Enum for different character movements

@@ -6,7 +6,6 @@
 #include "../include/charSelection.h"
 #include "../include/fightingGround.h"
 
-
 // Function prototypes
 void renderMainMenu(SDL_Renderer *renderer, TTF_Font *font);
 void handleMainMenuEvents(SDL_Event *event, GameState *currentState);
@@ -81,13 +80,12 @@ int main(int argc, char *argv[])
     GameState currentState = MAIN_MENU;
     SDL_Event event;
 
-    
     loadCharacterTextures(renderer);
     loadCharacterFrames(renderer);
     loadBackgroundMusic();
     playBackgroundMusic();
     SDL_RenderClear(renderer);
-    renderFightingGround(renderer,font);
+    renderFightingGround(renderer, font);
 
     // Main loop
 
@@ -110,10 +108,10 @@ int main(int argc, char *argv[])
             }
             else if (currentState == FIGHTING_GROUND)
             {
-                handleEvents(&event,&currentState);
+                handleEvents(&event, &currentState);
             }
             updateCharacterPositions();
-            SDL_Delay(16);
+            
         }
 
         // Render based on current state
@@ -129,14 +127,12 @@ int main(int argc, char *argv[])
         }
         else if (currentState == FIGHTING_GROUND)
         {
-            renderFightingGround(renderer,font);
-            
+            renderFightingGround(renderer, font);
         }
-        else if(currentState == GAME_OVER)
+        else if (currentState == GAME_OVER)
         {
-             
+
             renderGameOver(renderer, font);
-           
         }
         SDL_RenderPresent(renderer);
     }
@@ -367,4 +363,4 @@ void cleanup(SDL_Renderer *renderer, SDL_Window *window, TTF_Font *font)
     TTF_Quit();
     IMG_Quit();
     SDL_Quit();
-} 
+}

@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <SDL.h>
 #include <SDL_image.h>
-#include <dirent.h>
+
 #include <string.h>
 #include <stdbool.h>
 #include "../include/charSelection.h"
@@ -10,12 +10,12 @@
 
 // Define constants
 #define FRAME_DELAY 100  
-#define MAX_FRAMES 100  // Maximum frames per movement (adjust as needed)
-#define NUM_MOVES 5     
+#define MAX_FRAMES 100  
+#define NUM_MOVES 6     
 #define MOVE_SPEED 10   
 #define CHARACTER_SPEED 5 
 #define MAX_HEALTH 100  // Maximum health for characters
-#define ATTACK_COOLDOWN 500 // Add a cooldown period in milliseconds (e.g., 500 ms)
+#define ATTACK_COOLDOWN 2000 // Add a cooldown period in milliseconds 
 // Global variables
 SDL_Texture *backgroundTexture = NULL;
 SDL_Texture *characterFrames[NUM_CHARACTERS][NUM_MOVES][MAX_FRAMES] = {NULL};
@@ -34,14 +34,15 @@ int characterHealth[2] = {MAX_HEALTH, MAX_HEALTH};
 // Positions for characters in the fighting ground
 SDL_Rect characterPositions[2] = {
     {100, 450, 80, 100}, // Position for the first character
-    {550, 450, 80, 110}  // Position for the second character
+    {550, 450, 80, 100}  // Position for the second character
 };
-SDL_Rect popupRect = {200, 150, 400, 300};
-SDL_Rect buttonRect = {350, 400, 100, 50};
+
+SDL_Rect buttonRect = {325, 300, 150, 50};
+
 // Function to load character frames
 void loadCharacterFrames(SDL_Renderer *renderer) {
     char framePath[150];
-    const char *moveNames[NUM_MOVES] = {"stand", "forward", "backward", "kick", "punch"};
+    const char *moveNames[NUM_MOVES] = {"stand", "forward", "backward", "kick", "punch","dead"};
 
     for (int i = 0; i < NUM_CHARACTERS; i++) {
         for (int m = 0; m < NUM_MOVES; m++) {
@@ -72,13 +73,13 @@ void renderHealthBars(SDL_Renderer *renderer) {
     SDL_Color lowHealthColor = {255, 0, 0, 255}; // Red
 
     for (int i = 0; i < 2; i++) {
-        int healthBarWidth = (characterHealth[i] * 200) / MAX_HEALTH; // Max width is 200 pixels
+        int healthBarWidth = (characterHealth[i] * 200) / MAX_HEALTH; 
         SDL_Rect healthBarRect;
 
         if (i == 0) {
-            healthBarRect = (SDL_Rect){20, 20, healthBarWidth, 20}; // Character 1's health bar on the left
+            healthBarRect = (SDL_Rect){20, 20, healthBarWidth, 20}; 
         } else {
-            healthBarRect = (SDL_Rect){580, 20, healthBarWidth, 20}; // Character 2's health bar on the right
+            healthBarRect = (SDL_Rect){580, 20, healthBarWidth, 20}; 
         }
 
         if (characterHealth[i] > 30) {
@@ -107,9 +108,9 @@ void handleCharacterAttacks() {
     Uint64 currentTime = SDL_GetTicks64();
 
     // Define attack range offsets
-    const int PUNCH_RANGE = 5;  // Reduced punch range for more realistic detection
-    const int KICK_RANGE = 10;   // Reduced kick range for more realistic detection
-    const int PUSHBACK_DISTANCE = 15;  // Distance to push back the character when hit
+    const int PUNCH_RANGE = 0;  
+    const int KICK_RANGE = 0;   
+    const int PUSHBACK_DISTANCE = 30;  
 
     // Set up attack rectangles based on current attack state
     for (int i = 0; i < 2; i++) {
@@ -165,16 +166,16 @@ void handleCharacterAttacks() {
     if (characterHealth[0] == 0 && !gameOver) {
         gameOver = true;
         winner = 1;  // Player 2 wins
-        // You could add dead animation here if you have it
-        characterStates[0] = MOVE_DEAD; // Assume you have a "dead" state for the character
+        
+        characterStates[0] = MOVE_DEAD; // Assume to have a "dead" state for the character
         
         
     }
     if (characterHealth[1] == 0 && !gameOver) {
         gameOver = true;
         winner = 0;  // Player 1 wins
-        // You could add dead animation here if you have it
-        characterStates[1] = MOVE_DEAD; // Assume you have a "dead" state for the character
+        
+        characterStates[1] = MOVE_DEAD; // Assume we have a "dead" state for the character
     }
 }
 
@@ -257,18 +258,21 @@ void updateCharacterPositions() {
         }
     }
 }
-SDL_Rect Messagerect = {400, 300, 0, 0};  // Position at (400, 300), width and height 0 (to be calculated)
+SDL_Rect Messagerect = {400, 300, 0, 0};  
 
 void renderGameOver(SDL_Renderer *renderer, TTF_Font *font) {
-    SDL_Rect buttonTextRect;
+    // Draw a semi-transparent background over the entire window
+    SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255); // Black with transparency
+    SDL_Rect fullWindowRect = {0, 0, 800, 600}; // Assuming your window size is 800x600
+    SDL_RenderFillRect(renderer, &fullWindowRect);
+
+    // Render the winner message
     const char *winnerMessage = (winner == 0) ? "Player 1 Wins!" : "Player 2 Wins!";
     SDL_Color whiteColor = {255, 255, 255, 255}; // White text
 
-    // Calculate text size
+    // Calculate text size and center the message
     int textWidth, textHeight;
     TTF_SizeText(font, winnerMessage, &textWidth, &textHeight);
-
-    // Center the message
     Messagerect.x = (800 - textWidth) / 2;
     Messagerect.y = (600 - textHeight) / 2 - 50; // Adjust Y for positioning
     Messagerect.w = textWidth;
@@ -279,7 +283,6 @@ void renderGameOver(SDL_Renderer *renderer, TTF_Font *font) {
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 200); // Black with some transparency
     SDL_RenderFillRect(renderer, &messageBackground);
 
-    // Render the winner message
     renderText(renderer, winnerMessage, font, whiteColor, &Messagerect);
 
     // Render "Back to Main Menu" button
@@ -293,6 +296,7 @@ void renderGameOver(SDL_Renderer *renderer, TTF_Font *font) {
     TTF_SizeText(font, buttonText, &buttonTextWidth, &buttonTextHeight);
 
     buttonRect.x = (800 - buttonRect.w) / 2; // Center horizontally
+    SDL_Rect buttonTextRect;
     buttonTextRect.x = buttonRect.x + (buttonRect.w - buttonTextWidth) / 2;
     buttonTextRect.y = buttonRect.y + (buttonRect.h - buttonTextHeight) / 2;
     buttonTextRect.w = buttonTextWidth;
@@ -302,10 +306,11 @@ void renderGameOver(SDL_Renderer *renderer, TTF_Font *font) {
 }
 
 
+
 // Main function to render the fighting ground
 void renderFightingGround(SDL_Renderer *renderer, TTF_Font *font) {
     if (gameOver) {
-        // Render game-over popup and menu button
+        
         renderGameOver(renderer, font);
         return; // Exit early if the game is over
     }
@@ -396,4 +401,4 @@ void resetGameState() {
     // Reset game-over flag and winner
     gameOver = false;
     winner = -1;
-}
+}  
